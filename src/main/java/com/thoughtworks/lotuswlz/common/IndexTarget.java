@@ -1,9 +1,8 @@
 package com.thoughtworks.lotuswlz.common;
 
-import com.google.common.base.Function;
-import org.apache.lucene.document.Document;
+import com.google.common.primitives.Floats;
 
-public class IndexTarget {
+public class IndexTarget implements Comparable<IndexTarget> {
 
     protected float score;
 
@@ -14,5 +13,9 @@ public class IndexTarget {
     public void setScore(float score) {
 
         this.score = score;
+    }
+    @Override
+    public int compareTo(IndexTarget o) {
+        return Floats.compare(o.score, this.score);
     }
 }

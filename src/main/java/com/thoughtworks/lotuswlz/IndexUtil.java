@@ -5,7 +5,6 @@ import com.google.common.collect.Lists;
 import com.thoughtworks.lotuswlz.common.IndexConfig;
 import com.thoughtworks.lotuswlz.common.Constants;
 import com.thoughtworks.lotuswlz.common.IndexTarget;
-import com.thoughtworks.lotuswlz.model.Book;
 import org.apache.lucene.analysis.standard.StandardAnalyzer;
 import org.apache.lucene.document.*;
 import org.apache.lucene.index.*;
@@ -16,11 +15,8 @@ import org.apache.lucene.search.IndexSearcher;
 import org.apache.lucene.search.Query;
 import org.apache.lucene.search.ScoreDoc;
 import org.apache.lucene.search.TopDocs;
-import org.apache.lucene.store.Directory;
-import org.apache.lucene.store.FSDirectory;
 import org.apache.lucene.util.Version;
 
-import java.io.File;
 import java.io.IOException;
 import java.util.List;
 
@@ -31,41 +27,6 @@ public class IndexUtil {
 
     private IndexUtil() throws IOException {
 
-
-    }
-
-    public List<String> searchBook(String field, String text) throws Exception{
-        QueryParser parser;
-        if (field.contains(",")) {
-            parser = new MultiFieldQueryParser(field.split(" *, *"), new StandardAnalyzer());
-        } else {
-            parser = new QueryParser(field, new StandardAnalyzer());
-        }
-        Query query = parser.parse(text);
-
-        IndexReader reader = DirectoryReader.open(FSDirectory.open(new File(Constants.INDEX_PATH)));
-        IndexSearcher searcher = new IndexSearcher(reader);
-
-        TopDocs results = searcher.search(query, 100);
-        ScoreDoc[] hits = results.scoreDocs;
-        int numTotalHits = results.totalHits;
-
-        System.out.println(numTotalHits + " total matched.");
-
-        List<String> matchBookIds = Lists.newArrayList();
-
-        for (ScoreDoc doc : hits) {
-            System.out.print(doc.score);
-            Document matchedDoc = searcher.doc(doc.doc);
-
-            System.out.print(matchedDoc.get("bookId"));
-            System.out.print("\t");
-            System.out.println(matchedDoc.get("bookName"));
-
-            matchBookIds.add(matchedDoc.get("bookName"));
-        }
-
-        return matchBookIds;
     }
 
     public static IndexUtil getInstance() {
@@ -82,33 +43,33 @@ public class IndexUtil {
         config.setOpenMode(IndexWriterConfig.OpenMode.CREATE);
 
         indexWriter = new IndexWriter(indexConfig.getDirectory(), config);
-        List<Document> documents = Lists.transform(targets, indexConfig.getDocumentTranslateFunction());
-        indexWriter.addDocuments(documents);
+        indexWriter.addDocuments(Lists.transform(targets, indexConfig.getDocumentTranslateFunction()));
         indexWriter.close();
     }
 
-    public <T extends IndexTarget> List<T> search(String[] searchFields, String keyword, IndexConfig<T> bookIndexConfig) throws IOException, ParseException {
+    public <T extends IndexTarget> List<T> search(String[] searchFields, String keyword, IndexConfig<T> indexConfig) throws IOException, ParseException {
         QueryParser parser = new MultiFieldQueryParser(searchFields, new StandardAnalyzer());
         Query query = parser.parse(keyword);
 
-        IndexReader reader = DirectoryReader.open(bookIndexConfig.getDirectory());
+        IndexReader reader = DirectoryReader.open(indexConfig.getDirectory());
         final IndexSearcher searcher = new IndexSearcher(reader);
 
         TopDocs result = searcher.search(query, Constants.MAX_SEARCH_COUNT);
 
         List<ScoreDoc> scoreDocs = Lists.newArrayList(result.scoreDocs);
-        List<Document> docs = Lists.transform(scoreDocs, new Function<ScoreDoc, Document>() {
-            @Override
-            public Document apply(ScoreDoc scoreDoc) {
-                try {
-                    return searcher.doc(scoreDoc.doc);
-                } catch (IOException e) {
-                    return null;
-                }
+        Function<Document, T> targetTranslator = indexConfig.getTargetTranslateFunction();
+
+        List<T> targets = Lists.newArrayList();
+        for (ScoreDoc scoreDoc : scoreDocs) {
+            Document document = searcher.doc(scoreDoc.doc);
+            T target = targetTranslator.apply(document);
+            if (target != null) {
+                target.setScore(scoreDoc.score);
+                targets.add(target);
             }
-        });
+        }
         reader.close();
-        return Lists.transform(docs, bookIndexConfig.getTargetTranslateFunction());
+        return targets;
     }
 
 }

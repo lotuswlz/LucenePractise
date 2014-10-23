@@ -1,6 +1,7 @@
 package com.thoughtworks.lotuswlz.model;
 
 import com.google.common.base.Function;
+import com.google.common.primitives.Ints;
 import com.thoughtworks.lotuswlz.common.IndexTarget;
 import org.apache.lucene.document.Document;
 import org.apache.lucene.document.Field;
@@ -10,7 +11,7 @@ import org.apache.lucene.document.TextField;
 import java.io.Serializable;
 import java.util.Date;
 
-public class Book extends IndexTarget implements Serializable, Comparable<Book> {
+public class Book extends IndexTarget implements Serializable {
 
     private int id;
     private String name;
@@ -132,15 +133,16 @@ public class Book extends IndexTarget implements Serializable, Comparable<Book> 
         this.borrowedNumber = borrowedNumber;
     }
 
-    public int compareTo(Book o) {
-        if (o == null) {
-            return 1;
+    @Override
+    public int compareTo(IndexTarget o) {
+        int value = super.compareTo(o);
+        if (value > 0) {
+            return value;
         }
-        if (this.id > o.getId()) {
-            return 1;
-        } else if (this.id == o.getId()) {
-            return 0;
+        if (o == null || !(o instanceof Book)) {
+            return -1;
         }
-        return -1;
+        Book b = (Book) o;
+        return Ints.compare(b.getId(), this.id);
     }
 }
